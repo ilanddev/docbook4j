@@ -51,6 +51,8 @@ abstract class BaseRenderer<T extends BaseRenderer<T>> implements Renderer<T> {
 
     protected String xslResource;
 
+    protected String userConfigXmlResource;
+
     protected Map<String, String> params = new HashMap<String, String>();
 
     protected Map<String, Object> vars = new HashMap<String, Object>();
@@ -58,6 +60,12 @@ abstract class BaseRenderer<T extends BaseRenderer<T>> implements Renderer<T> {
     @SuppressWarnings("unchecked")
     public T xml(String xmlResource) {
         this.xmlResource = xmlResource;
+        return (T) this;
+    }
+
+    @SuppressWarnings("unchecked")
+    public T userConfig(String userConfigXmlResource) {
+        this.userConfigXmlResource = userConfigXmlResource;
         return (T) this;
     }
 
@@ -107,6 +115,7 @@ abstract class BaseRenderer<T extends BaseRenderer<T>> implements Renderer<T> {
         FileObject xsltResult = null;
         FileObject xmlSourceFileObject = null;
         FileObject xslSourceFileObject = null;
+        FileObject userConfigXmlSourceFileObject = null;
 
         try {
 
@@ -115,6 +124,10 @@ abstract class BaseRenderer<T extends BaseRenderer<T>> implements Renderer<T> {
                 xslSourceFileObject = FileObjectUtils.resolveFile(xslResource);
             } else {
                 xslSourceFileObject = getDefaultXslStylesheet();
+            }
+
+            if(userConfigXmlResource != null) {
+                userConfigXmlSourceFileObject = FileObjectUtils.resolveFile(userConfigXmlResource);
             }
 
             SAXParserFactory factory = createParserFactory();
@@ -153,7 +166,7 @@ abstract class BaseRenderer<T extends BaseRenderer<T>> implements Renderer<T> {
 
             // do post processing
             FileObject target = postProcess(xmlSourceFileObject,
-                    xslSourceFileObject, xsltResult);
+                    xslSourceFileObject, xsltResult, userConfigXmlSourceFileObject);
 
             FileObjectUtils.closeFileObjectQuietly(xsltResult);
             FileObjectUtils.closeFileObjectQuietly(target);
@@ -177,7 +190,7 @@ abstract class BaseRenderer<T extends BaseRenderer<T>> implements Renderer<T> {
     }
 
     protected FileObject postProcess(FileObject xmlSource,
-                                     FileObject xslSource, FileObject xsltResult)
+                                     FileObject xslSource, FileObject xsltResult, FileObject userConfigXml)
             throws Docbook4JException {
         return xsltResult;
     }

@@ -16,21 +16,33 @@
 
 package com.google.code.docbook4j.renderer;
 
-import com.google.code.docbook4j.Docbook4JException;
-import com.google.code.docbook4j.FileObjectUtils;
-import com.google.code.docbook4j.VfsURIResolver;
+import java.io.File;
+import java.io.IOException;
+import java.util.UUID;
+
+import javax.xml.datatype.DatatypeConfigurationException;
+import javax.xml.transform.Result;
+import javax.xml.transform.Source;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.sax.SAXResult;
+import javax.xml.transform.stream.StreamSource;
+
 import org.apache.avalon.framework.configuration.Configuration;
+import org.apache.avalon.framework.configuration.ConfigurationException;
+import org.apache.avalon.framework.configuration.DefaultConfigurationBuilder;
 import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemException;
 import org.apache.fop.apps.FOPException;
 import org.apache.fop.apps.FOUserAgent;
 import org.apache.fop.apps.Fop;
 import org.apache.fop.apps.FopFactory;
+import org.xml.sax.SAXException;
 
-import javax.xml.transform.*;
-import javax.xml.transform.sax.SAXResult;
-import javax.xml.transform.stream.StreamSource;
-import java.util.UUID;
+import com.google.code.docbook4j.Docbook4JException;
+import com.google.code.docbook4j.FileObjectUtils;
+import com.google.code.docbook4j.VfsURIResolver;
 
 abstract class FORenderer<T extends FORenderer<T>> extends BaseRenderer<T> {
 
@@ -43,7 +55,7 @@ abstract class FORenderer<T extends FORenderer<T>> extends BaseRenderer<T> {
 
     @Override
     protected FileObject postProcess(final FileObject xmlSource,
-                                     final FileObject xslSource, final FileObject xsltResult)
+                                     final FileObject xslSource, final FileObject xsltResult, final FileObject userConfigXml)
             throws Docbook4JException {
 
         FileObject target = null;
@@ -62,9 +74,11 @@ abstract class FORenderer<T extends FORenderer<T>> extends BaseRenderer<T> {
             target = FileObjectUtils.resolveFile(tmpPdf);
             target.createFile();
 
-            Configuration configuration = createFOPConfig();
+            Configuration configuration = createFOPConfig(userConfigXml);
             if (configuration != null) {
                 fopFactory.setUserConfig(configuration);
+                fopFactory.setBaseURL(userConfigXml.getParent().getURL().toExternalForm());
+                fopFactory.setFontBaseURL(userConfigXml.getParent().getURL().toExternalForm());
             }
 
             Fop fop = fopFactory.newFop(getMimeType(), userAgent, target
@@ -89,8 +103,13 @@ abstract class FORenderer<T extends FORenderer<T>> extends BaseRenderer<T> {
             throw new Docbook4JException("Error transforming fo to pdf!", e);
         } catch (FOPException e) {
             throw new Docbook4JException("Error transforming fo to pdf!", e);
+        } catch(ConfigurationException e){
+            throw new Docbook4JException("Error loading user configuration!", e);
+        } catch (SAXException e) {
+            throw new Docbook4JException("Error loading user configuration!", e);
+        } catch (IOException e) {
+            throw new Docbook4JException("Error loading user configuration!", e);
         } finally {
-
             FileObjectUtils.closeFileObjectQuietly(target);
         }
 
@@ -99,8 +118,14 @@ abstract class FORenderer<T extends FORenderer<T>> extends BaseRenderer<T> {
     protected void enhanceFOUserAgent(FOUserAgent userAgent) {
     }
 
-    protected Configuration createFOPConfig() {
-        return null;
+  protected Configuration createFOPConfig(final FileObject userConfigXml)
+      throws IOException, SAXException, ConfigurationException {
+        if(userConfigXml == null){
+          return null;
+        }
+        DefaultConfigurationBuilder cfgBuilder = new DefaultConfigurationBuilder();
+        Configuration cfg = cfgBuilder.build(userConfigXml.getContent().getInputStream());
+        return cfg;
     }
 
     protected abstract String getMimeType();

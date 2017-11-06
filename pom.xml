@@ -19,14 +19,14 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>net.javaforge.docbook4j</groupId>
     <artifactId>docbook4j</artifactId>
-    <version>1.0.2-iland</version>
+    <version>1.0.3-iland</version>
     <name>docbook4j</name>
     <description>docbook4j: embeddable java library able to render docbook documents</description>
     <url>https://github.com/ilanddev/docbook4j</url>
 
 
     <properties>
-        <slf4j.version>1.7.5</slf4j.version>
+        <slf4j.version>1.7.25</slf4j.version>
         <junit.version>4.11</junit.version>
     </properties>
 
@@ -62,7 +62,7 @@
         <dependency>
             <groupId>xalan</groupId>
             <artifactId>xalan</artifactId>
-            <version>2.7.1</version>
+            <version>2.7.2</version>
         </dependency>
         <dependency>
             <groupId>xerces</groupId>
@@ -77,7 +77,7 @@
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-vfs2</artifactId>
-            <version>2.0</version>
+            <version>2.2</version>
             <exclusions>
                 <exclusion>
                     <groupId>commons-logging</groupId>

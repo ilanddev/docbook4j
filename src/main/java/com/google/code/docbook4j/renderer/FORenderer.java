@@ -16,11 +16,13 @@
 
 package com.google.code.docbook4j.renderer;
 
-import java.io.File;
+import com.google.code.docbook4j.Docbook4JException;
+import com.google.code.docbook4j.FileObjectUtils;
+import com.google.code.docbook4j.VfsResourceResolver;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.UUID;
-
-import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.transform.Result;
 import javax.xml.transform.Source;
 import javax.xml.transform.Transformer;
@@ -28,106 +30,105 @@ import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.sax.SAXResult;
 import javax.xml.transform.stream.StreamSource;
-
 import org.apache.avalon.framework.configuration.Configuration;
 import org.apache.avalon.framework.configuration.ConfigurationException;
 import org.apache.avalon.framework.configuration.DefaultConfigurationBuilder;
 import org.apache.commons.vfs2.FileObject;
 import org.apache.commons.vfs2.FileSystemException;
 import org.apache.fop.apps.FOPException;
-import org.apache.fop.apps.FOUserAgent;
 import org.apache.fop.apps.Fop;
-import org.apache.fop.apps.FopFactory;
+import org.apache.fop.apps.FopFactoryBuilder;
 import org.xml.sax.SAXException;
-
-import com.google.code.docbook4j.Docbook4JException;
-import com.google.code.docbook4j.FileObjectUtils;
-import com.google.code.docbook4j.VfsURIResolver;
 
 abstract class FORenderer<T extends FORenderer<T>> extends BaseRenderer<T> {
 
-    private static final String defaultXslStylesheet = "res:xsl/docbook/fo/docbook.xsl";
+  private static final String defaultXslStylesheet =
+      "res:xsl/docbook/fo/docbook.xsl";
 
-    @Override
-    protected FileObject getDefaultXslStylesheet() {
-        return resolveXslStylesheet(defaultXslStylesheet);
-    }
+  @Override
+  protected FileObject getDefaultXslStylesheet() {
+    return resolveXslStylesheet(defaultXslStylesheet);
+  }
 
-    @Override
-    protected FileObject postProcess(final FileObject xmlSource,
-                                     final FileObject xslSource, final FileObject xsltResult, final FileObject userConfigXml)
-            throws Docbook4JException {
+  @Override
+  protected FileObject postProcess(final FileObject xmlSource,
+      final FileObject xslSource, final FileObject xsltResult,
+      final FileObject userConfigXml)
+      throws Docbook4JException {
 
-        FileObject target = null;
-        try {
+    FileObject target = null;
+    try {
 
-            final FopFactory fopFactory = FopFactory.newInstance();
+      FopFactoryBuilder builder =
+          new FopFactoryBuilder(xmlSource.getParent().getURL().toURI(),
+              new VfsResourceResolver());
+      builder.setBaseURI(xmlSource.getParent().getURL().toURI());
 
-            final FOUserAgent userAgent = fopFactory.newFOUserAgent();
-            userAgent.setBaseURL(xmlSource.getParent().getURL()
-                    .toExternalForm());
-            userAgent.setURIResolver(new VfsURIResolver());
+      String tmpPdf = "tmp://" + UUID.randomUUID().toString();
+      target = FileObjectUtils.resolveFile(tmpPdf);
+      target.createFile();
 
-            enhanceFOUserAgent(userAgent);
-
-            String tmpPdf = "tmp://" + UUID.randomUUID().toString();
-            target = FileObjectUtils.resolveFile(tmpPdf);
-            target.createFile();
-
-            Configuration configuration = createFOPConfig(userConfigXml);
-            if (configuration != null) {
-                fopFactory.setUserConfig(configuration);
-                fopFactory.setBaseURL(userConfigXml.getParent().getURL().toExternalForm());
-                fopFactory.setFontBaseURL(userConfigXml.getParent().getURL().toExternalForm());
-            }
-
-            Fop fop = fopFactory.newFop(getMimeType(), userAgent, target
-                    .getContent().getOutputStream());
-
-            TransformerFactory factory = TransformerFactory.newInstance();
-            Transformer transformer = factory.newTransformer(); // identity
-            // transformer
-            transformer.setParameter("use.extensions", "1");
-            transformer.setParameter("fop.extensions", "0");
-            transformer.setParameter("fop1.extensions", "1");
-
-            Source src = new StreamSource(xsltResult.getContent()
-                    .getInputStream());
-            Result res = new SAXResult(fop.getDefaultHandler());
-            transformer.transform(src, res);
-            return target;
-
-        } catch (FileSystemException e) {
-            throw new Docbook4JException("Error create filesystem manager!", e);
-        } catch (TransformerException e) {
-            throw new Docbook4JException("Error transforming fo to pdf!", e);
-        } catch (FOPException e) {
-            throw new Docbook4JException("Error transforming fo to pdf!", e);
-        } catch(ConfigurationException e){
-            throw new Docbook4JException("Error loading user configuration!", e);
-        } catch (SAXException e) {
-            throw new Docbook4JException("Error loading user configuration!", e);
-        } catch (IOException e) {
-            throw new Docbook4JException("Error loading user configuration!", e);
-        } finally {
-            FileObjectUtils.closeFileObjectQuietly(target);
+      final Configuration configuration = createFOPConfig(userConfigXml);
+      if (configuration != null) {
+        final String configUrl = userConfigXml.getParent().getURL().toExternalForm();
+        final String baseUrl;
+        if(!configUrl.endsWith("/")) {
+          baseUrl = userConfigXml.getParent().getURL().toExternalForm() + "/";
+        } else {
+          baseUrl  = configUrl;
         }
+        builder = new FopFactoryBuilder(new URI(baseUrl))
+            .setConfiguration(configuration);
+      }
 
+      final Fop fop =
+          builder.build().newFop(getMimeType(), target
+              .getContent().getOutputStream());
+
+      TransformerFactory factory = TransformerFactory.newInstance();
+      Transformer transformer = factory.newTransformer(); // identity
+      // transformer
+      transformer.setParameter("use.extensions", "1");
+      transformer.setParameter("fop.extensions", "0");
+      transformer.setParameter("fop1.extensions", "1");
+
+      Source src = new StreamSource(xsltResult.getContent()
+          .getInputStream());
+      Result res = new SAXResult(fop.getDefaultHandler());
+      transformer.transform(src, res);
+      return target;
+
+    } catch (final URISyntaxException e) {
+      throw new Docbook4JException("Error resovling URI!", e);
+    } catch (FileSystemException e) {
+      throw new Docbook4JException("Error create filesystem manager!", e);
+    } catch (TransformerException e) {
+      throw new Docbook4JException("Error transforming fo to pdf!", e);
+    } catch (FOPException e) {
+      throw new Docbook4JException("Error transforming fo to pdf!", e);
+    } catch (ConfigurationException e) {
+      throw new Docbook4JException("Error loading user configuration!", e);
+    } catch (SAXException e) {
+      throw new Docbook4JException("Error loading user configuration!", e);
+    } catch (IOException e) {
+      throw new Docbook4JException("Error loading user configuration!", e);
+    } finally {
+      FileObjectUtils.closeFileObjectQuietly(target);
     }
 
-    protected void enhanceFOUserAgent(FOUserAgent userAgent) {
-    }
+  }
 
   protected Configuration createFOPConfig(final FileObject userConfigXml)
       throws IOException, SAXException, ConfigurationException {
-        if(userConfigXml == null){
-          return null;
-        }
-        DefaultConfigurationBuilder cfgBuilder = new DefaultConfigurationBuilder();
-        Configuration cfg = cfgBuilder.build(userConfigXml.getContent().getInputStream());
-        return cfg;
+    if (userConfigXml == null) {
+      return null;
     }
+    DefaultConfigurationBuilder cfgBuilder = new DefaultConfigurationBuilder();
+    Configuration cfg =
+        cfgBuilder.build(userConfigXml.getContent().getInputStream());
+    return cfg;
+  }
 
-    protected abstract String getMimeType();
+  protected abstract String getMimeType();
 
 }

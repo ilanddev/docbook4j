@@ -16,12 +16,16 @@
 
 package com.google.code.docbook4j;
 
-import org.apache.commons.vfs2.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.net.MalformedURLException;
 import java.net.URL;
+
+import org.apache.commons.vfs2.FileObject;
+import org.apache.commons.vfs2.FileSystemException;
+import org.apache.commons.vfs2.FileSystemManager;
+import org.apache.commons.vfs2.FileSystemOptions;
+import org.apache.commons.vfs2.VFS;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class FileObjectUtils {
 
@@ -35,57 +39,32 @@ public final class FileObjectUtils {
     private FileObjectUtils() {
     }
 
-    public static final void setFileSystemOptions(FileSystemOptions options) {
+    public static void setFileSystemOptions(FileSystemOptions options) {
         fileSystemOptions = options;
     }
 
-    public static final FileObject resolveFile(String location, String baseDir)
-            throws FileSystemException {
-
-        if (location.toLowerCase().startsWith("res:")
-                || location.toLowerCase().startsWith("tmp:")
-                || location.toLowerCase().startsWith("zip:"))
+    public static FileObject resolveFile(String location, String baseDir)
+        throws FileSystemException {
+        if (location.toLowerCase().startsWith("res:") || location.toLowerCase()
+            .startsWith("tmp:") || location.toLowerCase().startsWith("zip:"))
             return resolveFile(location);
-
         try {
-
             new URL(location); // try to determine, if location is a
-            // valid url? if not, exception will
-            // be thrown
-
+            // valid url? if not, exception will be thrown
             return resolveFile(location);
-
-        } catch (MalformedURLException e1) {
-
+        } catch (final MalformedURLException e1) {
             return resolveFile(baseDir + "/" + location);
-
         }
-
     }
 
-    public static final FileObject resolveFile(String location)
-            throws FileSystemException {
-
+    public static FileObject resolveFile(String location)
+        throws FileSystemException {
         log.debug("Resolving file object: {}", location);
-
         if (fsManager == null)
             fsManager = VFS.getManager();
-
         if (fileSystemOptions != null)
             return fsManager.resolveFile(location, fileSystemOptions);
-
         return fsManager.resolveFile(location);
-    }
-
-    public static final void closeFileObjectQuietly(FileObject fo) {
-        if (fo != null) {
-            try {
-                fo.close();
-            } catch (FileSystemException e) {
-                log.error("Error closing file object: " + fo, e);
-            }
-        }
-
     }
 
 }

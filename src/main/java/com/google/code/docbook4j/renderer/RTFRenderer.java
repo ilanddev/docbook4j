@@ -25,16 +25,15 @@ public class RTFRenderer extends FORenderer<RTFRenderer> {
         return MimeConstants.MIME_RTF;
     }
 
-    public static final RTFRenderer create() {
+    public static RTFRenderer create() {
         return new RTFRenderer();
     }
 
-    public static final RTFRenderer create(String xmlResource) {
+    public static RTFRenderer create(String xmlResource) {
         return new RTFRenderer().xml(xmlResource);
     }
 
-    public static final RTFRenderer create(String xmlResource,
-                                           String xslResource) {
+    public static RTFRenderer create(String xmlResource, String xslResource) {
         return new RTFRenderer().xml(xmlResource).xsl(xslResource);
     }
 }

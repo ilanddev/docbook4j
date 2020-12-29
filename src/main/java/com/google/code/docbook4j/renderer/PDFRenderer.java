@@ -25,16 +25,15 @@ public class PDFRenderer extends FORenderer<PDFRenderer> {
         return MimeConstants.MIME_PDF;
     }
 
-    public static final PDFRenderer create() {
+    public static PDFRenderer create() {
         return new PDFRenderer();
     }
 
-    public static final PDFRenderer create(String xmlResource) {
+    public static PDFRenderer create(String xmlResource) {
         return new PDFRenderer().xml(xmlResource);
     }
 
-    public static final PDFRenderer create(String xmlResource,
-                                           String xslResource) {
+    public static PDFRenderer create(String xmlResource, String xslResource) {
         return new PDFRenderer().xml(xmlResource).xsl(xslResource);
     }
 

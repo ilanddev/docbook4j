@@ -35,23 +35,22 @@ public class HTMLRenderer extends BaseRenderer<HTMLRenderer> {
         return resolveXslStylesheet(defaultXslStylesheet);
     }
 
-    public static final HTMLRenderer create() {
+    public static HTMLRenderer create() {
         return new HTMLRenderer();
     }
 
-    public static final HTMLRenderer create(String xmlResource) {
+    public static HTMLRenderer create(String xmlResource) {
         return new HTMLRenderer().xml(xmlResource);
     }
 
-    public static final HTMLRenderer create(String xmlResource,
-                                            String xslResource) {
+    public static HTMLRenderer create(String xmlResource, String xslResource) {
         return new HTMLRenderer().xml(xmlResource).xsl(xslResource);
     }
 
-    public static final HTMLRenderer create(String xmlResource,
-                                            String xslResource, String cssResource) {
+    public static HTMLRenderer create(String xmlResource, String xslResource,
+        String cssResource) {
         return new HTMLRenderer().xml(xmlResource).xsl(xslResource)
-                .css(cssResource);
+            .css(cssResource);
     }
 
 }

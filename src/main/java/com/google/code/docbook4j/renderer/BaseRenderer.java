@@ -16,31 +16,30 @@
 
 package com.google.code.docbook4j.renderer;
 
-import com.google.code.docbook4j.Docbook4JException;
-import com.google.code.docbook4j.ExpressionEvaluatingXMLReader;
-import com.google.code.docbook4j.FileObjectUtils;
-import com.google.code.docbook4j.XslURIResolver;
-import org.apache.commons.vfs2.FileObject;
-import org.apache.commons.vfs2.FileSystemException;
-import org.apache.commons.vfs2.FileSystemOptions;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.xml.sax.EntityResolver;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
-import org.xml.sax.XMLReader;
-
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.parsers.SAXParserFactory;
-import javax.xml.transform.*;
-import javax.xml.transform.sax.SAXSource;
-import javax.xml.transform.stream.StreamResult;
-import javax.xml.transform.stream.StreamSource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.parsers.SAXParserFactory;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.sax.SAXSource;
+import javax.xml.transform.stream.StreamResult;
+
+import com.google.code.docbook4j.Docbook4JException;
+import com.google.code.docbook4j.ExpressionEvaluatingXMLReader;
+import com.google.code.docbook4j.FileObjectInputSource;
+import com.google.code.docbook4j.FileObjectUtils;
+import org.apache.commons.vfs2.FileObject;
+import org.apache.commons.vfs2.FileSystemException;
+import org.apache.commons.vfs2.FileSystemOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.xml.sax.InputSource;
+import org.xml.sax.SAXException;
+import org.xml.sax.XMLReader;
 
 abstract class BaseRenderer<T extends BaseRenderer<T>> implements Renderer<T> {
 
@@ -108,85 +107,57 @@ abstract class BaseRenderer<T extends BaseRenderer<T>> implements Renderer<T> {
     }
 
     public InputStream render() throws Docbook4JException {
-
         assertNotNull(xmlResource,
-                "Value of the xml source should be not null!");
-
-        FileObject xsltResult = null;
-        FileObject xmlSourceFileObject = null;
-        FileObject xslSourceFileObject = null;
-        FileObject userConfigXmlSourceFileObject = null;
-
-        try {
-
-            xmlSourceFileObject = FileObjectUtils.resolveFile(xmlResource);
-            if (xslResource != null) {
-                xslSourceFileObject = FileObjectUtils.resolveFile(xslResource);
-            } else {
-                xslSourceFileObject = getDefaultXslStylesheet();
-            }
-
-            if(userConfigXmlResource != null) {
-                userConfigXmlSourceFileObject = FileObjectUtils.resolveFile(userConfigXmlResource);
-            }
-
-            SAXParserFactory factory = createParserFactory();
+            "Value of the xml source should be not null!");
+        final FileObject result;
+        try (final FileObject xmlSourceFileObject = FileObjectUtils
+            .resolveFile(xmlResource);
+            final FileObject xslSourceFileObject = xslResource != null ?
+                FileObjectUtils.resolveFile(xslResource) :
+                getDefaultXslStylesheet();
+            final DocbookTransformer transformer = new DocbookTransformer(
+                xmlSourceFileObject, xslSourceFileObject, params);
+            final FileObject xsltResult = FileObjectUtils
+                .resolveFile("tmp://" + UUID.randomUUID().toString());
+            final FileObject userConfigXmlSourceFileObject =
+                userConfigXmlResource != null ?
+                    FileObjectUtils.resolveFile(userConfigXmlResource) :
+                    null) {
+            final SAXParserFactory factory = createParserFactory();
             final XMLReader reader = factory.newSAXParser().getXMLReader();
 
-            EntityResolver resolver = new EntityResolver() {
-                public InputSource resolveEntity(String publicId,
-                                                 String systemId) throws SAXException, IOException {
-
-                    log.debug("Resolving file {}", systemId);
-
-                    FileObject inc = FileObjectUtils.resolveFile(systemId);
-                    return new InputSource(inc.getContent().getInputStream());
-                }
-            };
-
             // prepare xml sax source
-            ExpressionEvaluatingXMLReader piReader = new ExpressionEvaluatingXMLReader(
-                    reader, vars);
-            piReader.setEntityResolver(resolver);
+            final ExpressionEvaluatingXMLReader piReader =
+                new ExpressionEvaluatingXMLReader(reader, vars);
+            piReader.setEntityResolver((publicId, systemId) -> {
+                log.debug("Resolving file {}", systemId);
+                FileObject inc = FileObjectUtils.resolveFile(systemId);
+                return new InputSource(inc.getContent().getInputStream());
+            });
 
-            SAXSource source = new SAXSource(piReader, new InputSource(
-                    xmlSourceFileObject.getContent().getInputStream()));
-            source.setSystemId(xmlSourceFileObject.getURL().toExternalForm());
+            final SAXSource source = new SAXSource(piReader,
+                new FileObjectInputSource(xmlSourceFileObject));
 
             // prepare xslt result
-            xsltResult = FileObjectUtils.resolveFile("tmp://"
-                    + UUID.randomUUID().toString());
             xsltResult.createFile();
 
-            // create transofrmer and do transformation
-            final Transformer transformer = createTransformer(
-                    xmlSourceFileObject, xslSourceFileObject);
-            transformer.transform(source, new StreamResult(xsltResult
-                    .getContent().getOutputStream()));
+            // create transformer and do transformation
+            transformer.transform(source,
+                new StreamResult(xsltResult.getContent().getOutputStream()));
 
             // do post processing
-            FileObject target = postProcess(xmlSourceFileObject,
-                    xslSourceFileObject, xsltResult, userConfigXmlSourceFileObject);
-
-            FileObjectUtils.closeFileObjectQuietly(xsltResult);
-            FileObjectUtils.closeFileObjectQuietly(target);
-            return target.getContent().getInputStream();
-
-        } catch (FileSystemException e) {
-            throw new Docbook4JException("Error transofrming xml!", e);
-        } catch (SAXException e) {
-            throw new Docbook4JException("Error transofrming xml!", e);
-        } catch (ParserConfigurationException e) {
-            throw new Docbook4JException("Error transofrming xml!", e);
-        } catch (TransformerException e) {
-            throw new Docbook4JException("Error transofrming xml!", e);
+            result = postProcess(xmlSourceFileObject, xslSourceFileObject,
+                xsltResult, userConfigXmlSourceFileObject);
+        } catch (final TransformerException | ParserConfigurationException | SAXException e) {
+            throw new Docbook4JException("Error transforming xml!", e);
         } catch (IOException e) {
-            throw new Docbook4JException("Error transofrming xml !", e);
-        } finally {
-            FileObjectUtils.closeFileObjectQuietly(xmlSourceFileObject);
-            FileObjectUtils.closeFileObjectQuietly(xslSourceFileObject);
+            throw new Docbook4JException("Error transforming xml !", e);
         }
-
+        try {
+            return result.getContent().getInputStream();
+        } catch (final FileSystemException e) {
+            throw new Docbook4JException("Error transforming xml!", e);
+        }
     }
 
     protected FileObject postProcess(FileObject xmlSource,
@@ -200,39 +171,6 @@ abstract class BaseRenderer<T extends BaseRenderer<T>> implements Renderer<T> {
         factory.setXIncludeAware(true);
         factory.setNamespaceAware(true);
         return factory;
-    }
-
-    protected TransformerFactory createTransformerFactory() {
-        return TransformerFactory.newInstance();
-    }
-
-    protected Transformer createTransformer(FileObject xmlSource,
-                                            FileObject xslStylesheet) throws TransformerConfigurationException,
-            IOException {
-
-        TransformerFactory transformerFactory = createTransformerFactory();
-        if (xslStylesheet != null) {
-            transformerFactory.setURIResolver(new XslURIResolver());
-        }
-        FileObject xsl = xslStylesheet != null ? xslStylesheet
-                : getDefaultXslStylesheet();
-
-        Source source = new StreamSource(xsl.getContent().getInputStream(), xsl
-                .getURL().toExternalForm());
-        Transformer transformer = transformerFactory.newTransformer(source);
-
-        transformer.setParameter("use.extensions", "1");
-        transformer.setParameter("callout.graphics", "0");
-        transformer.setParameter("callout.unicode", "1");
-        transformer.setParameter("callouts.extension", "1");
-        transformer.setParameter("base.dir", xmlSource.getParent().getURL()
-                .toExternalForm());
-
-        for (Map.Entry<String, String> entry : this.params.entrySet()) {
-            transformer.setParameter(entry.getKey(), entry.getValue());
-        }
-
-        return transformer;
     }
 
     protected abstract FileObject getDefaultXslStylesheet();

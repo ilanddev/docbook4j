@@ -19,7 +19,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>net.javaforge.docbook4j</groupId>
     <artifactId>docbook4j</artifactId>
-    <version>1.1.0-iland</version>
+    <version>1.1.1-iland</version>
     <name>docbook4j</name>
     <description>docbook4j: embeddable java library able to render docbook documents</description>
     <url>https://github.com/ilanddev/docbook4j</url>
